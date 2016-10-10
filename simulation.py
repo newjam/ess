@@ -1,7 +1,4 @@
 #!/usr/bin/env python
-"""
-An animated image
-"""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -22,7 +19,9 @@ EMPTY = 0
 HOG = 1
 SHARER = 2
 
+
 def neighbors(population, i, j):
+  """a list of the 4 neighbors around coordinates (i, j) in the population matrix"""
   return [
     population[i, (j + 1) % N],
     population[i, (j - 1) % N],
@@ -30,11 +29,14 @@ def neighbors(population, i, j):
     population[(i - 1) % M, j]
   ];
 
-
 def populated(population, i, j):
   return 1 if population[i % M, j % N] != EMPTY else 0
 
 def redistributeFood(population, food):
+  """ sharers send food to their neighbors
+
+  Maybe this is more of a "behavior strategy" step, ie this type of sharing is just one of many alternatives"
+  """
   newFood = np.zeros(shape=(M, N));
   for i in range(M):
     for j in range(N):
@@ -63,15 +65,17 @@ def redistributeFood(population, food):
           newFood[i, j] = food[i, j]
   return newFood
 
-def distributeFood():
-  foodDistribution = np.zeros(shape=(M, N));
-  for _ in range(FOOD):
+def distributeFood(shape=(M, N), food=FOOD):
+  """ randomly distribute food into an mxn matrix """
+  foodDistribution = np.zeros(shape=shape);
+  for _ in range(food):
     i = random.randint(0, M - 1)
     j = random.randint(0, M - 1)
     foodDistribution[i, j] += 1
   return foodDistribution
 
 def distributePopulation(density = INITIAL_POPULATION_DENSITY, proportion = INITIAL_SHARE_RATIO):
+  """ create an initial population distribution in a MxN matrix. """
   population = np.zeros(shape=(M, N))
   for i in range(M):
     for j in range(N):
@@ -80,6 +84,7 @@ def distributePopulation(density = INITIAL_POPULATION_DENSITY, proportion = INIT
   return population
 
 def cullPopulation(population, food):
+  """ kill individuals who don't have enough food """
   newPopulation = np.zeros(shape=(M, N))
   for i in range(M):
     for j in range(N):
@@ -99,6 +104,10 @@ def isPopulated(x):
   return not isEmpty(x)
 
 def propagatePopulation(population):
+  """ given a population distribution calculate the new population.
+  
+  if a cell is empty, it might become populated based on the presence of neighborss.
+  """
   newPopulation = np.zeros(shape=(M, N))
   for i in range(M):
     for j in range(N):
@@ -126,20 +135,22 @@ def propagatePopulation(population):
         newPopulation[i, j] = population[i, j]
   return newPopulation
 
-def step(population):
-  food = distributeFood()
-  
-  redistributedFood = redistributeFood(population, food)
-  print 'food:', food.sum(), '; redistributed:', redistributedFood.sum()
-  culledPopulation = cullPopulation(population, redistributedFood)
-  nextGeneration = propagatePopulation(culledPopulation)
-
-  l = nextGeneration.flatten()
+def populationStats(population):
+  l = population.flatten()
   sharers = len(filter(isSharer, l))
   hogs = len(filter(isHog, l))
+  return sharers, hogs
 
-  print 'hogs:', hogs, ', sharers:', sharers
-
+def step(population):
+  # food is randomlly distributed in each step.
+  food = distributeFood()
+  # sharers can redistribute the food (behaviorial strategy)
+  redistributedFood = redistributeFood(population, food)
+  print 'food:', food.sum(), '; redistributed:', redistributedFood.sum()
+  # the population is culled, those without food die. (AKA selection, differential success)
+  culledPopulation = cullPopulation(population, redistributedFood)
+  # the next generation is determined based on those that survived the culling (AKA reproduction)
+  nextGeneration = propagatePopulation(culledPopulation)
   return nextGeneration
 
 def testFoodPlot():
@@ -156,23 +167,43 @@ def plot(matrix):
   plt.ion()
   plt.show()
 
-
 global_population = distributePopulation()
+generation = 0
+xs = []
+hogCounts = []
+sharerCounts = []
 
 def animate():  
   global global_population
+  global generation
   global_population = distributePopulation()
+  generation = 0
   def update(_):
     global global_population
+    global generation
     global_population = step(global_population)
+
+    sharerCount, hogCount = populationStats(global_population)
+    print 'hogs:', hogCount, ', sharers:', sharerCount
+    sharerCounts.append(sharerCount)
+    hogCounts.append(hogCount)
+
+    generation += 1
+    xs.append(generation)
+
+    #hogLine.set_data(xs, hogCounts)
+
+    #shareLine.set_data(xs, sharerCounts)
+
     im.set_array(global_population)
-    return im,
+    return im
   
   fig = plt.figure()
-  ax = fig.add_subplot(1,1,1)
+  ax = fig.add_subplot(1, 1, 1)
   ax.set_aspect('equal')
   ax.set_xbound(0, M)
   ax.set_ybound(0, N)
+  #ax.set_title('Foo Bar')
   cmap = plt.cm.get_cmap('viridis', 3) 
   im = plt.imshow(global_population, interpolation='nearest', vmin=0, vmax=2, cmap=cmap)
 
@@ -180,7 +211,12 @@ def animate():
   hogPatch = mpatches.Patch(color=cmap(HOG), label='Hog')
   plt.legend(handles=[sharePatch, hogPatch], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
-  #plt.colorbar()
+  #ax2 = fig.add_subplot(2, 2, 2)
+  #hogLine, = plt.plot(xs, hogCounts)
+  #shareLine, = plt.plot(xs, sharerCounts)
+  #plt.xlabel('Generation')
+  #plt.ylabel('Population')
+  
   plt.ion()
   ani = animation.FuncAnimation(fig, update, interval=250, blit=False)
 
