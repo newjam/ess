@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.patches as mpatches
 import random
+from matplotlib.widgets import Button
 
 
 M = 100
@@ -146,6 +147,7 @@ def step(population):
   food = distributeFood()
   # sharers can redistribute the food (behaviorial strategy)
   redistributedFood = redistributeFood(population, food)
+  # TODO: food redistribution seems to result in a net loss of food... Where did it go? Must be a bug. Rounding errors? Seems too much
   print 'food:', food.sum(), '; redistributed:', redistributedFood.sum()
   # the population is culled, those without food die. (AKA selection, differential success)
   culledPopulation = cullPopulation(population, redistributedFood)
@@ -184,7 +186,7 @@ def animate():
     global_population = step(global_population)
 
     sharerCount, hogCount = populationStats(global_population)
-    print 'hogs:', hogCount, ', sharers:', sharerCount
+    print 'generation:', generation, ', hogs:', hogCount, ', sharers:', sharerCount, ', population:', sharerCount + hogCount
     sharerCounts.append(sharerCount)
     hogCounts.append(hogCount)
 
@@ -197,12 +199,16 @@ def animate():
 
     im.set_array(global_population)
     return im
-  
+
   fig = plt.figure()
+  #fig.subplots_adjust(bottom=0.2)
   ax = fig.add_subplot(1, 1, 1)
+
+
   ax.set_aspect('equal')
   ax.set_xbound(0, M)
   ax.set_ybound(0, N)
+
   #ax.set_title('Foo Bar')
   cmap = plt.cm.get_cmap('viridis', 3) 
   im = plt.imshow(global_population, interpolation='nearest', vmin=0, vmax=2, cmap=cmap)
@@ -210,6 +216,8 @@ def animate():
   sharePatch = mpatches.Patch(color=cmap(SHARER), label='Share')
   hogPatch = mpatches.Patch(color=cmap(HOG), label='Hog')
   plt.legend(handles=[sharePatch, hogPatch], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+ 
 
   #ax2 = fig.add_subplot(2, 2, 2)
   #hogLine, = plt.plot(xs, hogCounts)
@@ -219,6 +227,13 @@ def animate():
   
   plt.ion()
   ani = animation.FuncAnimation(fig, update, interval=250, blit=False)
+
+  #def clicked(event):
+  #  print 'button clicked'
+
+  #axReset = plt.axes([0.7, 0.05, 0.1, 0.075])
+  #buttonReset = Button(axReset, 'Reset')
+  #buttonReset.on_clicked(clicked) 
 
   #Writer = animation.writers['ffmpeg']
   #writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
